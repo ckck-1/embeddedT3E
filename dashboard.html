@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Embedded Systems Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+    <style>
+        :root {
+            /* Sophisticated, deep dark palette (No harsh blues/neons) */
+            --bg-color: #0d0e11;
+            --surface-color: #16181d;
+            --surface-border: #23272f;
+            
+            /* Premium Matte Golds */
+            --gold-primary: #dfb26c;
+            --gold-secondary: #c99a53;
+            --gold-muted: #5e4f37;
+            
+            /* Text Colors */
+            --text-main: #f3f4f6;
+            --text-muted: #8e95a5;
+            
+            /* Status Colors */
+            --status-red: #e05e5e;
+            --status-red-bg: rgba(224, 94, 94, 0.08);
+            --status-red-border: rgba(224, 94, 94, 0.2);
+            --status-gold-bg: rgba(223, 178, 108, 0.06);
+            --status-gold-border: rgba(223, 178, 108, 0.15);
+            
+            --transition-smooth: cubic-bezier(0.25, 0.8, 0.25, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Outfit', sans-serif;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem 1.5rem;
+        }
+
+        header {
+            width: 100%;
+            max-width: 480px;
+            text-align: center;
+            margin-bottom: 2.5rem;
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            color: var(--text-main);
+            margin-bottom: 0.5rem;
+        }
+
+        p.subtitle {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            font-weight: 400;
+            letter-spacing: 0.2px;
+        }
+
+        main {
+            width: 100%;
+            max-width: 480px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .dashboard-grid {
+            width: 100%;
+        }
+
+        /* Re-engineered Card layout: clean boundaries, subtle depth */
+        .card {
+            background-color: var(--surface-color);
+            border-radius: 24px;
+            padding: 3rem 2rem;
+            text-align: center;
+            border: 1px solid var(--surface-border);
+            box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.5);
+            transition: transform 0.4s var(--transition-smooth), 
+                        border-color 0.4s var(--transition-smooth), 
+                        box-shadow 0.4s var(--transition-smooth);
+            position: relative;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            border-color: rgba(223, 178, 108, 0.3);
+            box-shadow: 0 30px 50px -20px rgba(0, 0, 0, 0.7);
+        }
+
+        .card h2 {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 2rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        /* Massive typography for the readout without neon glows */
+        .temp-display {
+            font-size: 5.5rem;
+            font-weight: 700;
+            letter-spacing: -2px;
+            color: var(--text-main);
+            display: inline-flex;
+            align-items: baseline;
+            justify-content: center;
+            line-height: 1;
+            margin-bottom: 2rem;
+            transition: color 0.3s ease;
+        }
+
+        .unit {
+            font-size: 2.25rem;
+            font-weight: 400;
+            color: var(--gold-primary);
+            margin-left: 0.25rem;
+            letter-spacing: -0.5px;
+        }
+
+        /* Refined, industrial pill badges */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.6rem 1.5rem;
+            border-radius: 100px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+            background-color: var(--status-gold-bg);
+            color: var(--gold-primary);
+            border: 1px solid var(--status-gold-border);
+            transition: all 0.4s var(--transition-smooth);
+        }
+
+        .status-badge.disconnected {
+            background-color: var(--status-red-bg);
+            color: var(--status-red);
+            border-color: var(--status-red-border);
+        }
+
+        /* Tasteful Matte Pulse Indicator */
+        .live-dot {
+            height: 8px;
+            width: 8px;
+            background-color: var(--gold-primary);
+            border-radius: 50%;
+            display: inline-block;
+            animation: pulse-gold 2s infinite ease-in-out;
+        }
+
+        @keyframes pulse-gold {
+            0% { transform: scale(0.9); opacity: 0.4; }
+            50% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(0.9); opacity: 0.4; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>IoT Monitor</h1>
+        <p class="subtitle">Live Temperature Monitoring via MQTT</p>
+    </header>
+
+    <main>
+        <div class="dashboard-grid">
+            <div class="card">
+                <h2><span class="live-dot" id="live-dot" style="display: none;"></span>Current Temperature</h2>
+                <div class="temp-display">
+                    <span id="temp-value">--</span>
+                    <span class="unit">°C</span>
+                </div>
+                <div>
+                    <div id="connection-status" class="status-badge disconnected">Disconnected</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // MQTT Configuration
+        // Note: Connecting from a browser requires WebSockets.
+        // broker.hivemq.com supports Secure WebSockets (wss://) on port 8884.
+        const MQTT_BROKER = "broker.hivemq.com";
+        const MQTT_PORT = 8884;
+        const MQTT_TOPIC = "student/sensor/temperature";
+        
+        const clientID = "web_dashboard_" + Math.random().toString(16).substr(2, 8);
+        let client;
+
+        // UI Elements
+        const tempValueEl = document.getElementById('temp-value');
+        const statusEl = document.getElementById('connection-status');
+        const liveDot = document.getElementById('live-dot');
+
+        function connectMQTT() {
+            console.log(`Connecting to ${MQTT_BROKER}:${MQTT_PORT} over WebSockets...`);
+            statusEl.innerText = "Connecting...";
+            
+            client = new Paho.MQTT.Client(MQTT_BROKER, MQTT_PORT, clientID);
+            
+            client.onConnectionLost = onConnectionLost;
+            client.onMessageArrived = onMessageArrived;
+
+            const options = {
+                onSuccess: onConnect,
+                onFailure: onFailure,
+                useSSL: true, // Use wss:// for secure connections
+                timeout: 3
+            };
+
+            client.connect(options);
+        }
+
+        function onConnect() {
+            console.log("Connected to MQTT Broker!");
+            statusEl.innerText = "Connected";
+            statusEl.classList.remove('disconnected');
+            liveDot.style.display = 'inline-block';
+            
+            // Subscribe to the topic
+            client.subscribe(MQTT_TOPIC);
+            console.log(`Subscribed to topic: ${MQTT_TOPIC}`);
+        }
+
+        function onFailure(error) {
+            console.error("Failed to connect:", error.errorMessage);
+            statusEl.innerText = "Connection Failed (Retrying...)";
+            setTimeout(connectMQTT, 5000); // Retry after 5s
+        }
+
+        function onConnectionLost(responseObject) {
+            if (responseObject.errorCode !== 0) {
+                console.error("Connection lost:", responseObject.errorMessage);
+                statusEl.innerText = "Disconnected (Retrying...)";
+                statusEl.classList.add('disconnected');
+                liveDot.style.display = 'none';
+                tempValueEl.innerText = "--";
+                setTimeout(connectMQTT, 5000);
+            }
+        }
+
+        function onMessageArrived(message) {
+            console.log(`Received message on ${message.destinationName}: ${message.payloadString}`);
+            
+            if (message.destinationName === MQTT_TOPIC) {
+                // Parse and update the UI
+                const value = parseFloat(message.payloadString);
+                if (!isNaN(value)) {
+                    // Flash effect on update
+                    tempValueEl.style.color = 'var(--gold-secondary)';
+                    setTimeout(() => {
+                        tempValueEl.style.color = 'var(--text-main)';
+                    }, 300);
+
+                    tempValueEl.innerText = value.toFixed(2);
+                }
+            }
+        }
+
+        // Initialize connection when page loads
+        window.onload = connectMQTT;
+    </script>
+</body>
+</html>
