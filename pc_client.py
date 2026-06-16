@@ -12,7 +12,7 @@ BAUD_RATE = 9600
 
 # MQTT Broker Configuration
 MQTT_BROKER = "broker.hivemq.com" # Replace with your VPS broker IP/Domain if different
-MQTT_PORT = 1883
+MQTT_PORT = 24077
 MQTT_TOPIC = "student/sensor/temperature"
 
 # ---------------------------------------------------------
